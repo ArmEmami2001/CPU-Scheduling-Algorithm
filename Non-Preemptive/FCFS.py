@@ -1,5 +1,5 @@
 processes = [
-    {"pid": "P1", "arrival": 0, "execution": 5},
+    {"pid": "P1", "arrival": 20, "execution": 5},
     {"pid": "P2", "arrival": 1, "execution": 3},
     {"pid": "P3", "arrival": 2, "execution": 8}
 ]
