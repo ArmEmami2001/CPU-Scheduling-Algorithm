@@ -13,7 +13,7 @@ class Process:
     def __post_init__(self):
         self.remaining = self.burst
 
-Schedule = List[Tuple[str, int, int]]  # (pid, start, end)
+Schedule = List[Tuple[str, int, int]] 
 
 def rr_dynamic_n2(processes: List[Process]) -> Tuple[Schedule, Dict[str, Dict[str, int]]]:
     arrivals_list = sorted([(p.pid, p.arrival, p.burst) for p in processes],

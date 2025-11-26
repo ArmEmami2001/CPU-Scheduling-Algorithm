@@ -1,83 +1,83 @@
 import threading
-import itertools
+import time
 
 processes = [
-    {"pid": "P1", "arrival": 0, "burst": 7},
-    {"pid": "P2", "arrival": 2, "burst": 4},
-    {"pid": "P3", "arrival": 4, "burst": 1},
-    {"pid": "P4", "arrival": 5, "burst": 4},
+    {"pid": "P1", "arrival": 0, "execution": 5},
+    {"pid": "P2", "arrival": 1, "execution": 3},
+    {"pid": "P3", "arrival": 2, "execution": 8},
+    {"pid": "P4", "arrival": 3, "execution": 2},
 ]
 
-pending = []
-cv = threading.Condition()
-counter = itertools.count()
-producers_done = False
+class Process(threading.Thread):
+    def __init__(self, pid, burst):
+        threading.Thread.__init__(self, name=pid)
+        self.pid = pid
+        self.burst = burst
 
-def submit_process(proc):
-    with cv:
-        p = dict(proc)
-        p["seq"] = next(counter)
-        pending.append(p)
-        cv.notify()
+    def run(self):
+        print(f"\nRunning {self.pid}")
+        for i in range(self.burst, 0, -1):
+            print(f"Process {self.pid} remaining time: {i}")
+            time.sleep(0.2)
+        print(f"Process {self.pid} finished.\n")
 
-def worker_sjn():
-    time = 0
-    completed = []
-    print("Execution order:")
 
-    while True:
-        with cv:
-            current = None
+def sjn_scheduler(process_list):
+    print("\n--- SJN (Shortest Job Next) Scheduling Start ---\n")
 
-            while True:
-                if pending:
-                    available = [p for p in pending if p["arrival"] <= time]
-                    if available:
-                        available.sort(key=lambda p: (p["burst"], p["arrival"], p["seq"]))
-                        current = available[0]
-                        pending.remove(current)
-                        break
-                    else:
-                        next_arrival = min(p["arrival"] for p in pending)
-                        if time < next_arrival:
-                            time = next_arrival
-                            continue
+    process_list = sorted(process_list, key=lambda p: p["arrival"])
 
-                if producers_done:
-                    current = None
-                    break
-                cv.wait()
+    current_time = 0
+    ready_queue = []
+    finished = []
 
-        if current is None:
-            break
+    waiting_times = {}
+    turnaround_times = {}
 
-        start = time
-        waiting = time - current["arrival"]
-        time += current["burst"]
-        end = time
-        current["waiting"] = waiting
-        completed.append(current)
+    while len(finished) < len(process_list):
 
-        print(f"{current['pid']} (Waiting={waiting}, Start={start}, End={end})")
+        for p in process_list:
+            if p not in ready_queue and p not in finished:
+                if p["arrival"] <= current_time:
+                    ready_queue.append(p)
 
-    if completed:
-        avg_wait = sum(p["waiting"] for p in completed) / len(completed)
-        print(f"\nAverage Waiting Time: {avg_wait:.2f}")
+        if not ready_queue:
+            current_time += 1
+            continue
 
-producers = []
-for proc in processes:
-    t = threading.Thread(target=submit_process, args=(proc,))
-    t.start()
-    producers.append(t)
+        next_proc = min(ready_queue, key=lambda x: x["execution"])
 
-worker = threading.Thread(target=worker_sjn)
-worker.start()
+        pid = next_proc["pid"]
+        arrival = next_proc["arrival"]
+        burst = next_proc["execution"]
+        
+        start_time = current_time
+        waiting_time = start_time - arrival
+        waiting_times[pid] = waiting_time
 
-for t in producers:
-    t.join()
+        print(f"Dispatching {pid} | Burst = {burst} | Waiting = {waiting_time}")
 
-with cv:
-    producers_done = True
-    cv.notify_all()
+        proc = Process(pid, burst)
+        proc.start()
+        proc.join()
 
-worker.join()
+        current_time += burst
+
+        turnaround_times[pid] = waiting_time + burst
+
+
+        finished.append(next_proc)
+        ready_queue.remove(next_proc)
+
+    avg_wait = sum(waiting_times.values()) / len(waiting_times)
+    avg_tat = sum(turnaround_times.values()) / len(turnaround_times)
+
+    print("\n--- SJN Scheduling Complete ---\n")
+    print("Waiting Times:", waiting_times)
+    print(f"Average Waiting Time = {avg_wait:.2f}")
+    print(f"Average Turnaround Time = {avg_tat:.2f}\n")
+
+
+# MAIN
+if __name__ == "__main__":
+    sjn_scheduler(processes)
